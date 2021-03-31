@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+const POLL_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
+
 #[derive(Deserialize, Debug)]
 struct PersonRecord {
     id: u32,
@@ -20,7 +22,7 @@ struct DebeziumMessage {
 }
 
 fn main() -> anyhow::Result<()> {
-    println!("Hello, world!");
+    println!("Starting kafka consumer");
 
     let host = String::from("localhost:9094");
     let consumer = kafka::consumer::Consumer::from_hosts(vec![host])
@@ -28,10 +30,10 @@ fn main() -> anyhow::Result<()> {
         .with_fallback_offset(kafka::consumer::FetchOffset::Earliest)
         .create();
 
-    return match consumer {
+    match consumer {
         Ok(consumer) => start_polling(consumer),
         Err(error) => anyhow::bail!("OH NO {}", error),
-    };
+    }
 }
 
 fn start_polling(consumer: kafka::consumer::Consumer) -> anyhow::Result<()> {
@@ -47,6 +49,10 @@ fn start_polling(consumer: kafka::consumer::Consumer) -> anyhow::Result<()> {
                         Err(error) => anyhow::bail!("Could not parse message {}", error),
                     }
                 }
+            }
+
+            if ms.is_empty() {
+                std::thread::sleep(POLL_INTERVAL);
             }
         }
     }
