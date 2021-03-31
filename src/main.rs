@@ -1,6 +1,7 @@
+extern crate anyhow;
 extern crate kafka;
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     println!("Hello, world!");
 
     let host = String::from("localhost:9094");
@@ -9,19 +10,22 @@ fn main() {
         .with_fallback_offset(kafka::consumer::FetchOffset::Earliest)
         .create();
 
-    match consumer {
+    return match consumer {
         Ok(consumer) => start_polling(consumer),
-        Err(error) => panic!("OH NO {}", error),
-    }
+        Err(error) => anyhow::bail!("OH NO {}", error),
+    };
 }
 
-fn start_polling(consumer: kafka::consumer::Consumer) {
+fn start_polling(consumer: kafka::consumer::Consumer) -> anyhow::Result<()> {
     let mut consumer = consumer;
+
     loop {
         for ms in consumer.poll() {
             for messages in ms.iter() {
                 for message in messages.messages() {
-                    println!("Got message {:?}", message);
+                    let json = String::from_utf8(message.value.to_vec())?;
+
+                    println!("Got message {}", json);
                 }
             }
         }

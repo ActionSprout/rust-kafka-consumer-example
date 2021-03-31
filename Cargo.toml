@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 kafka = "0.8.0"
+anyhow = "1.0"
