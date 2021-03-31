@@ -11,14 +11,16 @@ fn main() -> anyhow::Result<()> {
         .with_fallback_offset(kafka::consumer::FetchOffset::Earliest)
         .create();
 
-    match consumer {
-        Ok(consumer) => consumer::start_polling(consumer, handle_event),
+    let (sender, receiver) = std::sync::mpsc::channel();
+
+    let consumer_handle = match consumer {
+        Ok(consumer) => consumer::start_polling(consumer, sender),
         Err(error) => anyhow::bail!("OH NO {}", error),
+    };
+
+    for event in receiver.iter() {
+        sink::handle_event(event)?;
     }
-}
 
-fn handle_event(event: model::Event) -> anyhow::Result<()> {
-    println!("Got message {:?}", event);
-
-    Ok(())
+    consumer_handle.join().unwrap()
 }
