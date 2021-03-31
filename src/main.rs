@@ -1,4 +1,6 @@
 mod consumer;
+mod model;
+mod sink;
 
 fn main() -> anyhow::Result<()> {
     println!("Starting kafka consumer");
@@ -10,7 +12,13 @@ fn main() -> anyhow::Result<()> {
         .create();
 
     match consumer {
-        Ok(consumer) => consumer::start_polling(consumer),
+        Ok(consumer) => consumer::start_polling(consumer, handle_event),
         Err(error) => anyhow::bail!("OH NO {}", error),
     }
+}
+
+fn handle_event(event: model::Event) -> anyhow::Result<()> {
+    println!("Got message {:?}", event);
+
+    Ok(())
 }
