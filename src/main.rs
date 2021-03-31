@@ -1,5 +1,23 @@
-extern crate anyhow;
-extern crate kafka;
+use serde::Deserialize;
+
+#[derive(Deserialize, Debug)]
+struct PersonRecord {
+    id: u32,
+    email: Option<String>,
+    name: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+struct DebeziumPayload {
+    op: String,
+    before: Option<PersonRecord>,
+    after: Option<PersonRecord>,
+}
+
+#[derive(Deserialize, Debug)]
+struct DebeziumMessage {
+    payload: DebeziumPayload,
+}
 
 fn main() -> anyhow::Result<()> {
     println!("Hello, world!");
@@ -23,11 +41,19 @@ fn start_polling(consumer: kafka::consumer::Consumer) -> anyhow::Result<()> {
         for ms in consumer.poll() {
             for messages in ms.iter() {
                 for message in messages.messages() {
-                    let json = String::from_utf8(message.value.to_vec())?;
-
-                    println!("Got message {}", json);
+                    match serde_json::from_slice::<DebeziumMessage>(message.value) {
+                        Ok(message) => handle_message(message)?,
+                        Err(error @ serde_json::Error { .. }) if error.is_eof() => {}
+                        Err(error) => anyhow::bail!("Could not parse message {}", error),
+                    }
                 }
             }
         }
     }
+}
+
+fn handle_message(message: DebeziumMessage) -> anyhow::Result<()> {
+    println!("Got message {:?}", message);
+
+    Ok(())
 }
