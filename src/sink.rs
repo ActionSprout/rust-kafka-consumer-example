@@ -17,7 +17,7 @@ const DELETE_QUERY: &str = "
 
 pub fn init() -> Result<Sink, postgres::Error> {
     let url = "postgres://whatcom:whatcom@localhost:52996/whatcom";
-    println!("Connecting to postgres: {}", url);
+    log::info!("Connecting to postgres: {}", url);
 
     let mut client = postgres::Client::connect(url, postgres::NoTls)?;
     let upsert_statement = client.prepare(UPSERT_QUERY)?;
@@ -32,7 +32,7 @@ pub fn init() -> Result<Sink, postgres::Error> {
 
 impl Sink {
     pub fn handle_event(&mut self, event: model::Event) -> anyhow::Result<u64, postgres::Error> {
-        println!("Got message {:?}", event);
+        log::info!("Got message {:?}", event);
 
         match event {
             model::Event::Create(person) | model::Event::Update(_, person) => self.upsert(person),

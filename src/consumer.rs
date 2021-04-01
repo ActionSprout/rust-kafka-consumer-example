@@ -17,7 +17,7 @@ struct DebeziumMessage {
 
 pub fn init() -> Result<kafka::consumer::Consumer, kafka::Error> {
     let host = String::from("localhost:9094");
-    println!("Connecting to kafka on {}", host);
+    log::info!("Connecting to kafka on {}", host);
 
     kafka::consumer::Consumer::from_hosts(vec![host])
         .with_topic(String::from("fernpeople.public.people"))
@@ -31,7 +31,7 @@ pub fn start_polling(
 ) -> std::thread::JoinHandle<anyhow::Result<()>> {
     std::thread::spawn(move || {
         let mut consumer = consumer;
-        println!("Starting kafka consumer");
+        log::debug!("Starting kafka consumer");
 
         loop {
             for ms in consumer.poll() {

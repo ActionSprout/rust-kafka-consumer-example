@@ -3,6 +3,9 @@ mod model;
 mod sink;
 
 fn main() -> anyhow::Result<()> {
+    pretty_env_logger::init_timed();
+    println!("Started logger with max_level {}", log::max_level());
+
     let (sender, receiver) = std::sync::mpsc::channel();
 
     let mut sink = sink::init()?;
