@@ -22,12 +22,32 @@ pub fn handle_event(
 ) -> anyhow::Result<u64, postgres::Error> {
     println!("Got message {:?}", event);
 
-    let (query, person) = match event {
-        model::Event::Create(person) | model::Event::Update(_, person) => (UPSERT_QUERY, person),
-        model::Event::Delete(person) => (DELETE_QUERY, person),
-        model::Event::Unknown => panic!("Oh no, got an unknown message"),
-    };
+    match event {
+        model::Event::Create(person) | model::Event::Update(_, person) => upsert(client, person),
+        model::Event::Delete(person) => delete(client, person),
+        model::Event::Unknown => Ok(0),
+    }
+}
 
+fn upsert(
+    client: &mut postgres::Client,
+    person: model::PersonRecord,
+) -> anyhow::Result<u64, postgres::Error> {
+    run_query(client, UPSERT_QUERY, person)
+}
+
+fn delete(
+    client: &mut postgres::Client,
+    person: model::PersonRecord,
+) -> anyhow::Result<u64, postgres::Error> {
+    run_query(client, DELETE_QUERY, person)
+}
+
+fn run_query(
+    client: &mut postgres::Client,
+    query: &str,
+    person: model::PersonRecord,
+) -> anyhow::Result<u64, postgres::Error> {
     if let model::PersonRecord { email: None, .. } = person {
         return Ok(0);
     }
