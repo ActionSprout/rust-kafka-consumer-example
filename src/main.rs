@@ -12,9 +12,13 @@ fn main() -> anyhow::Result<()> {
 
     let postgres_url = args.value_of("postgres-url").unwrap();
     let kafka_url = args.value_of("kafka-url").unwrap();
+    let topic = args.value_of("topic").unwrap();
 
     let mut sink = sink::init(postgres_url)?;
-    let consumer_conn = consumer::init(kafka_url);
+    let consumer_conn = consumer::init(&consumer::KafkaOptions {
+        host: String::from(kafka_url),
+        topic: String::from(topic),
+    });
 
     let consumer_handle = match consumer_conn {
         Ok(consumer_conn) => consumer::start_polling(consumer_conn, sender),

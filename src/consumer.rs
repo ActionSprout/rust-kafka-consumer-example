@@ -15,12 +15,19 @@ struct DebeziumMessage {
     payload: DebeziumPayload,
 }
 
-pub fn init(kafka_host: &str) -> Result<kafka::consumer::Consumer, kafka::Error> {
-    log::info!("Connecting to kafka on {}", kafka_host);
+#[derive(Debug)]
+pub struct KafkaOptions {
+    pub topic: String,
+    pub host: String,
+}
 
-    kafka::consumer::Consumer::from_hosts(vec![String::from(kafka_host)])
-        .with_topic(String::from("fernpeople.public.people"))
-        .with_fallback_offset(kafka::consumer::FetchOffset::Earliest)
+pub fn init(options: &KafkaOptions) -> Result<kafka::consumer::Consumer, kafka::Error> {
+    log::info!("Connecting to kafka {:?}", options);
+
+    // TODO: Support multiple hosts
+    kafka::consumer::Consumer::from_hosts(vec![options.host.clone()])
+        .with_topic(options.topic.clone())
+        // .with_fallback_offset(kafka::consumer::FetchOffset::Earliest)
         .create()
 }
 
