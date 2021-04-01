@@ -15,8 +15,7 @@ const DELETE_QUERY: &str = "
     DELETE FROM people WHERE email = $1
 ";
 
-pub fn init() -> Result<Sink, postgres::Error> {
-    let url = "postgres://whatcom:whatcom@localhost:52996/whatcom";
+pub fn init(url: &str) -> Result<Sink, postgres::Error> {
     log::info!("Connecting to postgres: {}", url);
 
     let mut client = postgres::Client::connect(url, postgres::NoTls)?;
