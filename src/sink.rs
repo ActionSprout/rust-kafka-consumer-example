@@ -1,6 +1,7 @@
 use crate::model;
 
 pub struct Sink {
+    client: postgres::Client,
     upsert_statement: postgres::Statement,
     delete_statement: postgres::Statement,
 }
@@ -14,57 +15,43 @@ const DELETE_QUERY: &str = "
     DELETE FROM people WHERE email = $1
 ";
 
-pub fn init() -> Result<(postgres::Client, Sink), postgres::Error> {
+pub fn init() -> Result<Sink, postgres::Error> {
     let url = "postgres://whatcom:whatcom@localhost:52996/whatcom";
     println!("Connecting to postgres: {}", url);
 
     let mut client = postgres::Client::connect(url, postgres::NoTls)?;
+    let upsert_statement = client.prepare(UPSERT_QUERY)?;
+    let delete_statement = client.prepare(DELETE_QUERY)?;
 
-    let sink = Sink {
-        upsert_statement: client.prepare(UPSERT_QUERY)?,
-        delete_statement: client.prepare(DELETE_QUERY)?,
-    };
-
-    Ok((client, sink))
+    Ok(Sink {
+        client,
+        upsert_statement,
+        delete_statement,
+    })
 }
 
 impl Sink {
-    pub fn handle_event(
-        &self,
-        client: &mut postgres::Client,
-        event: model::Event,
-    ) -> anyhow::Result<u64, postgres::Error> {
+    pub fn handle_event(&mut self, event: model::Event) -> anyhow::Result<u64, postgres::Error> {
         println!("Got message {:?}", event);
 
         match event {
-            model::Event::Create(person) | model::Event::Update(_, person) => {
-                self.upsert(client, person)
-            }
-            model::Event::Delete(person) => self.delete(client, person),
+            model::Event::Create(person) | model::Event::Update(_, person) => self.upsert(person),
+            model::Event::Delete(person) => self.delete(person),
             model::Event::Unknown => Ok(0),
         }
     }
 
-    fn upsert(
-        &self,
-        client: &mut postgres::Client,
-        person: model::PersonRecord,
-    ) -> anyhow::Result<u64, postgres::Error> {
-        self.run_query(client, &self.upsert_statement, person)
+    fn upsert(&mut self, person: model::PersonRecord) -> anyhow::Result<u64, postgres::Error> {
+        self.run_query(self.upsert_statement.clone(), person)
     }
 
-    fn delete(
-        &self,
-        client: &mut postgres::Client,
-        person: model::PersonRecord,
-    ) -> anyhow::Result<u64, postgres::Error> {
-        self.run_query(client, &self.delete_statement, person)
+    fn delete(&mut self, person: model::PersonRecord) -> anyhow::Result<u64, postgres::Error> {
+        self.run_query(self.delete_statement.clone(), person)
     }
 
     fn run_query(
-        &self,
-        client: &mut postgres::Client,
-        statement: &postgres::Statement,
+        &mut self,
+        statement: postgres::Statement,
         person: model::PersonRecord,
     ) -> anyhow::Result<u64, postgres::Error> {
         if let model::PersonRecord { email: None, .. } = person {
@@ -73,6 +60,6 @@ impl Sink {
 
         let email = person.email;
 
-        client.execute(statement, &[&email])
+        self.client.execute(&statement, &[&email])
     }
 }
