@@ -11,6 +11,6 @@ pub enum Event {
 #[derive(Deserialize, Debug)]
 pub struct PersonRecord {
     id: u32,
-    email: Option<String>,
+    pub email: Option<String>,
     name: Option<String>,
 }

@@ -5,7 +5,7 @@ mod sink;
 fn main() -> anyhow::Result<()> {
     let (sender, receiver) = std::sync::mpsc::channel();
 
-    let pg_conn = sink::init()?;
+    let mut pg_conn = sink::init()?;
     let consumer_conn = consumer::init();
 
     let consumer_handle = match consumer_conn {
@@ -14,7 +14,7 @@ fn main() -> anyhow::Result<()> {
     };
 
     for event in receiver.iter() {
-        sink::handle_event(&pg_conn, event)?;
+        sink::handle_event(&mut pg_conn, event)?;
     }
 
     consumer_handle.join().unwrap()
