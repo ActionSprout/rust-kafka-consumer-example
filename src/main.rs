@@ -1,3 +1,4 @@
+mod cli;
 mod consumer;
 mod model;
 mod sink;
@@ -5,28 +6,7 @@ mod sink;
 fn main() -> anyhow::Result<()> {
     pretty_env_logger::init_timed();
 
-    let args = clap::App::new("Rust Kafka Consumer Example")
-        .version("1.0")
-        .about("Polls kafka for debezium changes and upserts those changes to postgres.")
-        .arg(
-            clap::Arg::with_name("kafka-url")
-                // TODO: Support multiple broker urls
-                .long("kafka")
-                .env("KAFKA_URL")
-                .help("Kafka broker host and port (example: localhost:8082)")
-                .takes_value(true)
-                .required(true)
-                .default_value("localhost:9092"),
-        )
-        .arg(
-            clap::Arg::with_name("postgres-url")
-                .long("postgres")
-                .env("POSTGRES_URL")
-                .help("Postgres url (example: postgres://user:pass@localhost:5432/database)")
-                .takes_value(true)
-                .required(true),
-        )
-        .get_matches();
+    let args = cli::build_cli().get_matches();
 
     let (sender, receiver) = std::sync::mpsc::channel();
 
