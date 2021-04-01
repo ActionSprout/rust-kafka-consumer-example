@@ -1,10 +1,8 @@
 use crate::model;
 
-pub fn init() -> Result<postgres::Client, postgres::Error> {
-    let url = "postgres://whatcom:whatcom@localhost:52996/whatcom";
-    println!("Connecting to postgres: {}", url);
-
-    postgres::Client::connect(url, postgres::NoTls)
+pub struct Sink {
+    upsert_statement: postgres::Statement,
+    delete_statement: postgres::Statement,
 }
 
 const UPSERT_QUERY: &str = "
@@ -16,43 +14,65 @@ const DELETE_QUERY: &str = "
     DELETE FROM people WHERE email = $1
 ";
 
-pub fn handle_event(
-    client: &mut postgres::Client,
-    event: model::Event,
-) -> anyhow::Result<u64, postgres::Error> {
-    println!("Got message {:?}", event);
+pub fn init() -> Result<(postgres::Client, Sink), postgres::Error> {
+    let url = "postgres://whatcom:whatcom@localhost:52996/whatcom";
+    println!("Connecting to postgres: {}", url);
 
-    match event {
-        model::Event::Create(person) | model::Event::Update(_, person) => upsert(client, person),
-        model::Event::Delete(person) => delete(client, person),
-        model::Event::Unknown => Ok(0),
-    }
+    let mut client = postgres::Client::connect(url, postgres::NoTls)?;
+
+    let sink = Sink {
+        upsert_statement: client.prepare(UPSERT_QUERY)?,
+        delete_statement: client.prepare(DELETE_QUERY)?,
+    };
+
+    Ok((client, sink))
 }
 
-fn upsert(
-    client: &mut postgres::Client,
-    person: model::PersonRecord,
-) -> anyhow::Result<u64, postgres::Error> {
-    run_query(client, UPSERT_QUERY, person)
-}
+impl Sink {
+    pub fn handle_event(
+        &self,
+        client: &mut postgres::Client,
+        event: model::Event,
+    ) -> anyhow::Result<u64, postgres::Error> {
+        println!("Got message {:?}", event);
 
-fn delete(
-    client: &mut postgres::Client,
-    person: model::PersonRecord,
-) -> anyhow::Result<u64, postgres::Error> {
-    run_query(client, DELETE_QUERY, person)
-}
-
-fn run_query(
-    client: &mut postgres::Client,
-    query: &str,
-    person: model::PersonRecord,
-) -> anyhow::Result<u64, postgres::Error> {
-    if let model::PersonRecord { email: None, .. } = person {
-        return Ok(0);
+        match event {
+            model::Event::Create(person) | model::Event::Update(_, person) => {
+                self.upsert(client, person)
+            }
+            model::Event::Delete(person) => self.delete(client, person),
+            model::Event::Unknown => Ok(0),
+        }
     }
 
-    let email = person.email;
+    fn upsert(
+        &self,
+        client: &mut postgres::Client,
+        person: model::PersonRecord,
+    ) -> anyhow::Result<u64, postgres::Error> {
+        self.run_query(client, &self.upsert_statement, person)
+    }
 
-    client.execute(query, &[&email])
+    fn delete(
+        &self,
+        client: &mut postgres::Client,
+        person: model::PersonRecord,
+    ) -> anyhow::Result<u64, postgres::Error> {
+        self.run_query(client, &self.delete_statement, person)
+    }
+
+    fn run_query(
+        &self,
+        client: &mut postgres::Client,
+        statement: &postgres::Statement,
+        person: model::PersonRecord,
+    ) -> anyhow::Result<u64, postgres::Error> {
+        if let model::PersonRecord { email: None, .. } = person {
+            return Ok(0);
+        }
+
+        let email = person.email;
+
+        client.execute(statement, &[&email])
+    }
 }
