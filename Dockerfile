@@ -2,8 +2,6 @@
 FROM rust:1.51.0 AS build
 WORKDIR /usr/src
 
-# Download the target for static linking.
-RUN rustup target add x86_64-unknown-linux-musl
 RUN USER=root apt update && apt install -y musl-tools libssl-dev
 
 # Create a dummy project and build the app's dependencies.
@@ -16,7 +14,7 @@ RUN cargo build --release
 
 # Copy the source and build the application.
 COPY src ./src
-RUN cargo install --target x86_64-unknown-linux-musl --path .
+RUN cargo install --path .
 
 # Copy the statically-linked binary into a scratch container.
 FROM scratch
