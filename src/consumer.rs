@@ -47,7 +47,7 @@ pub fn start_polling(
                 for messages in ms.iter() {
                     for message in messages.messages() {
                         match serde_json::from_slice::<DebeziumMessage>(message.value) {
-                            Ok(message) => sender.send(convert_to_event(message))?,
+                            Ok(message) => sender.send(message.to_event())?,
                             Err(error @ serde_json::Error { .. }) if error.is_eof() => {}
                             Err(error) => anyhow::bail!("Could not parse message {}", error),
                         }
@@ -69,29 +69,31 @@ pub fn start_polling(
     })
 }
 
-fn convert_to_event(message: DebeziumMessage) -> model::Event {
-    match message.payload {
-        DebeziumPayload {
-            op,
-            before: None,
-            after: Some(after),
-            ..
-        } if op.as_str() == "c" => model::Event::Create(after),
+impl DebeziumMessage {
+    fn to_event(self) -> model::Event {
+        match self.payload {
+            DebeziumPayload {
+                op,
+                before: None,
+                after: Some(after),
+                ..
+            } if op.as_str() == "c" => model::Event::Create(after),
 
-        DebeziumPayload {
-            op,
-            before: Some(before),
-            after: Some(after),
-            ..
-        } if op.as_str() == "u" => model::Event::Update(before, after),
+            DebeziumPayload {
+                op,
+                before: Some(before),
+                after: Some(after),
+                ..
+            } if op.as_str() == "u" => model::Event::Update(before, after),
 
-        DebeziumPayload {
-            op,
-            before: Some(before),
-            after: None,
-            ..
-        } if op.as_str() == "d" => model::Event::Delete(before),
+            DebeziumPayload {
+                op,
+                before: Some(before),
+                after: None,
+                ..
+            } if op.as_str() == "d" => model::Event::Delete(before),
 
-        DebeziumPayload { .. } => model::Event::Unknown,
+            DebeziumPayload { .. } => model::Event::Unknown,
+        }
     }
 }
