@@ -8,7 +8,6 @@ description = "Polls kafka for debezium changes and upserts those changes to pos
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-kafka = "0.8.0"
 anyhow = "1.0"
 serde = { version = "1.0.125", features = ["derive"]}
 serde_json = "1.0.64"
@@ -16,3 +15,8 @@ postgres = "0.19.0"
 log = "0.4.14"
 pretty_env_logger = "0.4.0"
 clap = "2.33.3"
+
+
+[dependencies.kafka]
+default-features = false
+version = "0.8.0"
