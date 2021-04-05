@@ -36,18 +36,20 @@ pub fn init(options: &KafkaOptions) -> Result<kafka::consumer::Consumer, kafka::
 
 pub fn start_polling(
     consumer: kafka::consumer::Consumer,
-    sender: std::sync::mpsc::Sender<model::Event>,
-) -> std::thread::JoinHandle<anyhow::Result<()>> {
-    std::thread::spawn(move || {
+    sender: tokio::sync::mpsc::Sender<model::Event>,
+) -> tokio::task::JoinHandle<anyhow::Result<()>> {
+    tokio::spawn(async move {
         let mut consumer = consumer;
         log::debug!("Starting kafka consumer");
 
         loop {
             for ms in consumer.poll() {
+                let mut mq = vec![];
+
                 for messages in ms.iter() {
                     for message in messages.messages() {
                         match serde_json::from_slice::<DebeziumMessage>(message.value) {
-                            Ok(message) => sender.send(message.to_event())?,
+                            Ok(message) => mq.push(message.to_event()),
                             Err(error @ serde_json::Error { .. }) if error.is_eof() => {}
                             Err(error) => anyhow::bail!("Could not parse message {}", error),
                         }
@@ -57,8 +59,15 @@ pub fn start_polling(
                     }
                 }
 
+                for m in mq {
+                    sender.send(m.clone()).await?;
+                }
+
                 if ms.is_empty() {
-                    std::thread::sleep(POLL_INTERVAL);
+                    tokio::time::sleep(POLL_INTERVAL).await;
+                } else {
+                    // Feel free to remove this if we are using a kafka client that supports the tokio runtime.
+                    tokio::task::yield_now().await;
                 }
             }
 

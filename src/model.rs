@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Event {
     Create(PersonRecord),
     Update(PersonRecord, PersonRecord),
@@ -8,7 +8,7 @@ pub enum Event {
     Unknown,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct PersonRecord {
     id: u32,
     pub email: Option<String>,

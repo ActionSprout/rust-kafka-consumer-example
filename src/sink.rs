@@ -1,9 +1,9 @@
 use crate::model;
 
 pub struct Sink {
-    client: postgres::Client,
-    upsert_statement: postgres::Statement,
-    delete_statement: postgres::Statement,
+    client: tokio_postgres::Client,
+    upsert_statement: tokio_postgres::Statement,
+    delete_statement: tokio_postgres::Statement,
 }
 
 const UPSERT_QUERY: &str = "
@@ -15,12 +15,20 @@ const DELETE_QUERY: &str = "
     DELETE FROM people WHERE email = $1
 ";
 
-pub fn init(url: &str) -> Result<Sink, postgres::Error> {
+pub async fn init(url: &str) -> Result<Sink, tokio_postgres::Error> {
     log::info!("Connecting to postgres: {}", url);
 
-    let mut client = postgres::Client::connect(url, postgres::NoTls)?;
-    let upsert_statement = client.prepare(UPSERT_QUERY)?;
-    let delete_statement = client.prepare(DELETE_QUERY)?;
+    let (client, conn) = tokio_postgres::connect(url, tokio_postgres::NoTls).await?;
+
+    tokio::spawn(async move {
+        if let Err(e) = conn.await {
+            // TODO: Not panic
+            panic!("Panic connecting to postgres {}", e);
+        }
+    });
+
+    let upsert_statement = client.prepare(UPSERT_QUERY).await?;
+    let delete_statement = client.prepare(DELETE_QUERY).await?;
 
     Ok(Sink {
         client,
@@ -30,35 +38,46 @@ pub fn init(url: &str) -> Result<Sink, postgres::Error> {
 }
 
 impl Sink {
-    pub fn handle_event(&mut self, event: model::Event) -> anyhow::Result<u64, postgres::Error> {
+    pub async fn handle_event(
+        &mut self,
+        event: model::Event,
+    ) -> anyhow::Result<u64, tokio_postgres::Error> {
         log::info!("Got message {:?}", event);
 
         match event {
-            model::Event::Create(person) | model::Event::Update(_, person) => self.upsert(person),
-            model::Event::Delete(person) => self.delete(person),
+            model::Event::Create(person) | model::Event::Update(_, person) => {
+                self.upsert(person).await
+            }
+            model::Event::Delete(person) => self.delete(person).await,
             model::Event::Unknown => Ok(0),
         }
     }
 
-    fn upsert(&mut self, person: model::PersonRecord) -> anyhow::Result<u64, postgres::Error> {
-        self.run_query(self.upsert_statement.clone(), person)
-    }
-
-    fn delete(&mut self, person: model::PersonRecord) -> anyhow::Result<u64, postgres::Error> {
-        self.run_query(self.delete_statement.clone(), person)
-    }
-
-    fn run_query(
+    async fn upsert(
         &mut self,
-        statement: postgres::Statement,
         person: model::PersonRecord,
-    ) -> anyhow::Result<u64, postgres::Error> {
+    ) -> anyhow::Result<u64, tokio_postgres::Error> {
+        self.run_query(self.upsert_statement.clone(), person).await
+    }
+
+    async fn delete(
+        &mut self,
+        person: model::PersonRecord,
+    ) -> anyhow::Result<u64, tokio_postgres::Error> {
+        self.run_query(self.delete_statement.clone(), person).await
+    }
+
+    async fn run_query(
+        &mut self,
+        statement: tokio_postgres::Statement,
+        person: model::PersonRecord,
+    ) -> anyhow::Result<u64, tokio_postgres::Error> {
         if let model::PersonRecord { email: None, .. } = person {
             return Ok(0);
         }
 
         let email = person.email;
 
-        self.client.execute(&statement, &[&email])
+        self.client.execute(&statement, &[&email]).await
     }
 }
