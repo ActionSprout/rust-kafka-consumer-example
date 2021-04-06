@@ -15,10 +15,11 @@ const DELETE_QUERY: &str = "
     DELETE FROM people WHERE email = $1
 ";
 
-pub async fn init(url: &str) -> Result<Sink, tokio_postgres::Error> {
+pub async fn init(url: &str) -> anyhow::Result<Sink> {
     log::info!("Connecting to postgres: {}", url);
 
-    let (client, conn) = tokio_postgres::connect(url, tokio_postgres::NoTls).await?;
+    let connector = postgres_native_tls::MakeTlsConnector::new(native_tls::TlsConnector::new()?);
+    let (client, conn) = tokio_postgres::connect(url, connector).await?;
 
     tokio::spawn(async move {
         if let Err(e) = conn.await {
