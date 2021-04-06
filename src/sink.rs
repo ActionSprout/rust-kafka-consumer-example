@@ -18,8 +18,7 @@ const DELETE_QUERY: &str = "
 pub async fn init(url: &str) -> anyhow::Result<Sink> {
     log::info!("Connecting to postgres: {}", url);
 
-    let connector = postgres_native_tls::MakeTlsConnector::new(native_tls::TlsConnector::new()?);
-    let (client, conn) = tokio_postgres::connect(url, connector).await?;
+    let (client, conn) = tokio_postgres::connect(url, get_ssl_config()?).await?;
 
     tokio::spawn(async move {
         if let Err(e) = conn.await {
@@ -36,6 +35,15 @@ pub async fn init(url: &str) -> anyhow::Result<Sink> {
         upsert_statement,
         delete_statement,
     })
+}
+
+fn get_ssl_config() -> anyhow::Result<postgres_native_tls::MakeTlsConnector> {
+    let connector = native_tls::TlsConnector::builder()
+        .add_root_certificate(native_tls::Certificate::from_pem(include_bytes!(
+            "../ca.crt"
+        ))?)
+        .build()?;
+    Ok(postgres_native_tls::MakeTlsConnector::new(connector))
 }
 
 impl Sink {

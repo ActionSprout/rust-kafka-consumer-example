@@ -5,9 +5,11 @@ RUN rustup target add x86_64-unknown-linux-musl
 WORKDIR /usr/src
 COPY Cargo.toml Cargo.lock ./
 
+COPY ./ca.crt ./
 COPY src ./src
 RUN cargo install --target x86_64-unknown-linux-musl --path .
 
 FROM alpine
+RUN apk add --no-cache ca-certificates
 COPY --from=build /usr/local/cargo/bin/rust-kafka-consumer-example .
 CMD ["./rust-kafka-consumer-example"]
