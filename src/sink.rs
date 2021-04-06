@@ -18,7 +18,14 @@ const DELETE_QUERY: &str = "
 pub async fn init(url: &str) -> anyhow::Result<Sink> {
     log::info!("Connecting to postgres: {}", url);
 
-    let config = rustls::ClientConfig::new();
+    let mut store = rustls::RootCertStore::empty();
+    let cert = include_bytes!("../digitalocean-ca.crt");
+    let slice: &[u8] = &cert[..];
+
+    let mut cert_buf = std::io::BufReader::new(slice);
+    store.add_pem_file(&mut cert_buf);
+    let mut config = rustls::ClientConfig::new();
+    config.root_store = store;
     let tls = tokio_postgres_rustls::MakeRustlsConnect::new(config);
 
     let (client, conn) = tokio_postgres::connect(url, tls).await?;

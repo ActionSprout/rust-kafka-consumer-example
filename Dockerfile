@@ -5,6 +5,7 @@ RUN rustup target add x86_64-unknown-linux-musl
 WORKDIR /usr/src
 COPY Cargo.toml Cargo.lock ./
 
+COPY ./ca-certificate.crt .
 COPY src ./src
 RUN cargo install --target x86_64-unknown-linux-musl --path .
 
