@@ -18,8 +18,10 @@ const DELETE_QUERY: &str = "
 pub async fn init(url: &str) -> anyhow::Result<Sink> {
     log::info!("Connecting to postgres: {}", url);
 
-    let connector = postgres_native_tls::MakeTlsConnector::new(native_tls::TlsConnector::new()?);
-    let (client, conn) = tokio_postgres::connect(url, connector).await?;
+    let config = rustls::ClientConfig::new();
+    let tls = tokio_postgres_rustls::MakeRustlsConnect::new(config);
+
+    let (client, conn) = tokio_postgres::connect(url, tls).await?;
 
     tokio::spawn(async move {
         if let Err(e) = conn.await {
